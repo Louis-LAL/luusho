@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preuvia — États des lieux sans litige</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --ink: #1C2620;
+    --ink-soft: #5B6660;
+    --paper: #FAF8F3;
+    --card: #FFFFFF;
+    --line: #E4E0D4;
+    --forest: #1F3D2B;
+    --forest-light: #2E5940;
+    --clay: #C1613F;
+    --clay-soft: #FBEAE2;
+    --sage: #E7EEE3;
+  }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--paper); color: var(--ink); margin: 0; padding: 0; }
+  a { color: inherit; }
+
+  /* ---------- Coquille appli (écrans connecté / formulaires) ---------- */
+  .shell { width: 100%; max-width: 480px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 21px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.2px; }
+  h2 { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 600; margin: 0 0 10px; }
+  h3 { font-size: 14px; font-weight: 600; margin: 16px 0 6px; }
+  .subtitle { font-size: 14px; color: var(--ink-soft); margin: 0 0 20px; line-height: 1.5; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-soft); margin: 12px 0 4px; }
+  label:first-child { margin-top: 0; }
+  input[type="text"], input[type="email"], input[type="password"] { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); font-size: 14px; background: var(--paper); font-family: 'Inter', sans-serif; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button { font-family: 'Inter', sans-serif; }
+  button.primary { width: 100%; padding: 14px; background: var(--forest); color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 16px; }
+  button.primary:hover { background: var(--forest-light); }
+  button.primary:disabled { background: #C7CBC4; cursor: not-allowed; }
+  button.secondary { width: 100%; padding: 11px; background: white; color: var(--ink); border: 1.5px solid var(--line); border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 8px; }
+  button.small { padding: 6px 12px; font-size: 13px; border-radius: 8px; border: 1px solid var(--line); background: white; cursor: pointer; }
+  .tab { flex: 1; padding: 10px; text-align: center; border-radius: 10px; background: white; border: 1px solid var(--line); cursor: pointer; font-size: 14px; font-weight: 500; }
+  .tab.active { background: var(--forest); color: white; border-color: var(--forest); }
+  .code-banner { background: var(--sage); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .code-banner .code { font-family: 'Fraunces', serif; font-size: 19px; font-weight: 700; letter-spacing: 1px; color: var(--forest); }
+  .code-banner .label { font-size: 11px; color: var(--forest-light); margin: 0; }
+  .meta-line { font-size: 13px; color: var(--ink-soft); margin: 2px 0; }
+  .room-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; cursor: pointer; }
+  .room-card .rname { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  .add-room-row { display: flex; gap: 8px; margin-top: 4px; }
+  .add-room-row input { flex: 1; }
+  .photo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .photo-item { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+  .photo-item img { width: 100%; height: 100px; object-fit: cover; display: block; cursor: zoom-in; }
+  .photo-ts { font-size: 10px; color: white; background: rgba(0,0,0,0.6); padding: 2px 5px; position: absolute; bottom: 4px; left: 4px; border-radius: 4px; }
+  .photo-delete { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 6px; width: 22px; height: 22px; font-size: 13px; cursor: pointer; line-height: 1; }
+  .lightbox { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(20,20,18,0.92); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 100%; max-height: 85vh; border-radius: 10px; }
+  .lightbox-close { position: absolute; top: 16px; right: 16px; background: rgba(255,255,255,0.15); color: white; border: none; border-radius: 8px; width: 36px; height: 36px; font-size: 18px; cursor: pointer; }
+  .lightbox-ts { position: absolute; bottom: 20px; left: 0; right: 0; text-align: center; color: white; font-size: 13px; }
+  .upload-zone { border: 1.5px dashed #C7CBC4; border-radius: 10px; padding: 16px; text-align: center; cursor: pointer; font-size: 13px; color: var(--ink-soft); margin-top: 10px; }
+  input[type="file"] { display: none; }
+  .back-link { font-size: 13px; color: var(--ink-soft); cursor: pointer; margin-bottom: 12px; display: inline-block; }
+  .diff-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 8px; white-space: nowrap; flex-shrink: 0; }
+  .badge.majeur { background: var(--clay-soft); color: var(--clay); }
+  .badge.mineur { background: #FAEEDA; color: #854F0B; }
+  .diff-text p { margin: 0; font-size: 13px; }
+  .diff-text .conf { font-size: 11px; color: #888780; margin-top: 2px; }
+  .empty-state { text-align: center; font-size: 13px; color: var(--ink-soft); padding: 14px; background: var(--sage); border-radius: 10px; }
+  .error-box { background: var(--clay-soft); color: var(--clay); padding: 10px 12px; border-radius: 10px; font-size: 13px; margin-top: 10px; }
+  .notice { font-size: 12px; color: #888780; line-height: 1.5; margin-top: 14px; text-align: center; }
+  .status { text-align: center; font-size: 13px; color: var(--ink-soft); margin-top: 8px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .topbar .email { font-size: 12px; color: #888780; cursor: pointer; }
+
+  /* ---------- Site marketing (pleine largeur) ---------- */
+  .site-nav { position: sticky; top: 0; background: rgba(250,248,243,0.9); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); z-index: 100; }
+  .nav-inner { max-width: 1120px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .brand { font-family: 'Fraunces', serif; font-weight: 600; font-size: 18px; color: var(--forest); display: flex; align-items: center; gap: 7px; }
+  .brand .brand-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--clay); display: inline-block; }
+  .nav-links { display: flex; gap: 26px; align-items: center; }
+  .nav-links a { font-size: 14px; font-weight: 500; cursor: pointer; color: var(--ink); text-decoration: none; }
+  .nav-cta { display: flex; gap: 10px; }
+  .nav-cta button { width: auto; margin: 0; padding: 9px 16px; font-size: 13.5px; }
+  @media (max-width: 760px) { .nav-links { display: none; } }
+
+  .section { padding: 64px 24px; }
+  .section-inner { max-width: 1120px; margin: 0 auto; }
+  .section-tight { max-width: 720px; margin: 0 auto; text-align: center; }
+  .eyebrow { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--clay); margin-bottom: 10px; }
+
+  .hero-section { padding: 76px 24px 40px; }
+  .hero-grid { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; }
+  .hero-grid h1 { font-size: 42px; line-height: 1.12; margin: 0 0 18px; }
+  .hero-grid .accent { color: var(--clay); }
+  .hero-grid p.lead { font-size: 17px; color: var(--ink-soft); line-height: 1.6; max-width: 480px; margin: 0 0 28px; }
+  .hero-cta-row { display: flex; gap: 12px; }
+  .hero-cta-row button { width: auto; margin: 0; padding: 14px 24px; }
+  .hero-illustration-wrap { background: var(--sage); border-radius: 24px; padding: 28px; }
+  @media (max-width: 860px) { .hero-grid { grid-template-columns: 1fr; } .hero-grid h1 { font-size: 32px; } }
+
+  .stat-strip { display: flex; justify-content: center; gap: 56px; padding: 36px 24px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .stat { text-align: center; }
+  .stat .num { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 700; color: var(--forest); display: block; }
+  .stat .lbl { font-size: 12.5px; color: var(--ink-soft); max-width: 160px; }
+
+  .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 36px; }
+  @media (max-width: 860px) { .feature-grid { grid-template-columns: 1fr; } }
+  .feature-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+  .feature-card .ficon { width: 42px; height: 42px; border-radius: 11px; background: var(--sage); display: flex; align-items: center; justify-content: center; font-size: 19px; margin-bottom: 14px; }
+  .feature-card h3 { font-family: 'Fraunces', serif; font-size: 16px; margin: 0 0 6px; }
+  .feature-card p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.55; margin: 0; }
+
+  .steps-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 36px; }
+  @media (max-width: 860px) { .steps-row { grid-template-columns: 1fr; } }
+  .step-card .stepnum { font-family: 'Fraunces', serif; font-size: 34px; font-weight: 700; color: var(--line); }
+  .step-card h3 { font-family: 'Fraunces', serif; font-size: 16px; margin: 6px 0 6px; }
+  .step-card p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.55; }
+
+  .pricing-section { background: var(--sage); }
+  .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 40px; align-items: stretch; }
+  @media (max-width: 860px) { .pricing-grid { grid-template-columns: 1fr; } }
+  .plan-card { background: var(--card); border: 1.5px solid var(--line); border-radius: 18px; padding: 26px; display: flex; flex-direction: column; }
+  .plan-card.highlight { border-color: var(--forest); box-shadow: 0 3px 0 var(--forest); }
+  .plan-badge { display: inline-block; background: var(--forest); color: white; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 3px 8px; border-radius: 6px; margin-bottom: 10px; align-self: flex-start; }
+  .plan-card .pname { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; margin: 0; }
+  .plan-card .pprice { font-size: 26px; font-weight: 700; color: var(--forest); margin: 6px 0 2px; }
+  .plan-card .pprice span { font-size: 12.5px; font-weight: 500; color: var(--ink-soft); }
+  .plan-card .ptagline { font-size: 13px; color: var(--ink-soft); margin: 0 0 16px; }
+  .plan-feature { display: flex; gap: 8px; font-size: 13.5px; margin: 7px 0; align-items: flex-start; }
+  .plan-feature .check { color: var(--forest); font-weight: 700; }
+  .plan-card button.primary { margin-top: auto; padding-top: 20px; width: auto; align-self: stretch; }
+
+  .cta-band { position: relative; background: var(--forest); color: white; text-align: center; padding: 70px 24px; overflow: hidden; }
+  .cta-band .cta-bg { position: absolute; inset: 0; background-image: url('https://images.unsplash.com/photo-1649204873080-1564d1464c78?fm=jpg&q=70&w=1400&auto=format&fit=crop'); background-size: cover; background-position: center; opacity: 0.28; }
+  .cta-band .cta-content { position: relative; z-index: 1; }
+  .cta-band h2 { color: white; font-size: 26px; }
+  .cta-band p { color: #C9D6CC; font-size: 14.5px; margin-bottom: 22px; }
+  .cta-band button.primary { width: auto; padding: 14px 26px; background: white; color: var(--forest); margin: 0; }
+  .cta-band button.primary:hover { background: #EFEFE9; }
+
+  .site-footer { padding: 32px 24px; border-top: 1px solid var(--line); }
+  .footer-inner { max-width: 1120px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+  .footer-links { display: flex; gap: 20px; }
+  .footer-links a { font-size: 13px; color: var(--ink-soft); cursor: pointer; text-decoration: none; }
+  .footer-copy { font-size: 12.5px; color: #A3A79A; }
+
+  .legal-text { font-size: 13.5px; line-height: 1.65; color: var(--ink); }
+  .legal-text h3 { margin-top: 20px; font-size: 15px; }
+  .legal-text p { margin: 6px 0; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ⚠️ Renseigne ici l'URL et la clé anon de ton projet Supabase (Project Settings > API)
+const SUPABASE_URL = "https://eofytkmpyvfmvwlmvtik.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvZnl0a21weXZmbXZ3bG12dGlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwMzc2NjUsImV4cCI6MjEwMzYxMzY2NX0.XIOCI0G1mQjK-DI26c7e2c2pmKPy0KU5ty7RszJN1y0";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const app = document.getElementById('app');
+let state = { view: 'loading', session: null, dossier: null, code: null, currentRoom: null, selectedPlan: null };
+
+const PLANS = [
+  { id: 'starter', name: 'Starter', price: '25€ / mois', priceAnnual: '250€ / an', saveAnnual: 'Soit 2 mois offerts',
+    tagline: "Pour les propriétaires particuliers.",
+    features: ["Jusqu'à 20 états des lieux / mois", "1 utilisateur", "Photos horodatées illimitées", "Support par email"] },
+  { id: 'pro', name: 'Pro', price: '50€ / mois', priceAnnual: '500€ / an', saveAnnual: 'Soit 2 mois offerts',
+    tagline: "Pour les multi-propriétaires et petites agences.",
+    features: ["États des lieux illimités", "Jusqu'à 5 utilisateurs", "Comparaison par IA incluse", "Support prioritaire"] },
+  { id: 'agence', name: 'Agence', price: '120€ / mois', priceAnnual: '1 200€ / an', saveAnnual: 'Soit 2 mois offerts',
+    tagline: "Pour les agences et gestionnaires de parc.",
+    features: ["Utilisateurs illimités", "Plusieurs biens en simultané", "Comparaison par IA incluse", "Accompagnement dédié"] }
+];
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function genCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let c = '';
+  for (let i = 0; i < 6; i++) c += chars[Math.floor(Math.random() * chars.length)];
+  return c;
+}
+function formatTs(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+function resizeImage(dataUrl, maxWidth) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.src = dataUrl;
+  });
+}
+function dataUrlToBlob(dataUrl) {
+  const [header, base64] = dataUrl.split(',');
+  const mime = header.match(/:(.*?);/)[1];
+  const bin = atob(base64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+// ---------- INIT AUTH ----------
+sb.auth.getSession().then(({ data }) => {
+  state.session = data.session;
+  state.view = data.session ? 'home' : 'landing';
+  render();
+});
+sb.auth.onAuthStateChange((_event, session) => {
+  state.session = session;
+  if (!session) { state.view = 'landing'; render(); }
+});
+
+function render() {
+  if (state.view === 'loading') { app.innerHTML = '<p class="status" style="padding:40px;">Chargement...</p>'; return; }
+  if (state.view === 'landing') return renderLanding();
+  if (state.view === 'legal') return renderLegal();
+  if (state.view === 'login') return renderLogin();
+  if (state.view === 'signup-form') return renderSignupForm();
+  app.innerHTML = `<div class="shell" id="shellRoot"></div>`;
+  const root = document.getElementById('shellRoot');
+  if (state.view === 'home') return renderHome(root);
+  if (state.view === 'create') return renderCreate(root);
+  if (state.view === 'joinRole') return renderJoinRole(root);
+  if (state.view === 'dossier') return renderDossier(root);
+  if (state.view === 'room') return renderRoom(root);
+}
+
+function houseIllustration() {
+  return `
+  <svg viewBox="0 0 340 260" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto;">
+    <rect x="20" y="110" width="300" height="130" rx="10" fill="#FFFFFF" stroke="#1F3D2B" stroke-width="2.5"/>
+    <polygon points="170,40 300,110 40,110" fill="#1F3D2B"/>
+    <rect x="150" y="160" width="40" height="80" rx="4" fill="#C1613F"/>
+    <circle cx="181" cy="200" r="2.5" fill="#FAF8F3"/>
+    <rect x="60" y="140" width="46" height="40" rx="4" fill="#E7EEE3" stroke="#1F3D2B" stroke-width="2"/>
+    <rect x="234" y="140" width="46" height="40" rx="4" fill="#E7EEE3" stroke="#1F3D2B" stroke-width="2"/>
+    <g transform="translate(238,26) rotate(18)">
+      <circle cx="0" cy="0" r="13" fill="none" stroke="#C1613F" stroke-width="5"/>
+      <rect x="-3" y="11" width="6" height="26" fill="#C1613F"/>
+      <rect x="-3" y="26" width="14" height="6" fill="#C1613F"/>
+      <rect x="-3" y="35" width="10" height="6" fill="#C1613F"/>
+    </g>
+    <g transform="translate(46,60)">
+      <rect x="0" y="6" width="30" height="22" rx="4" fill="#FFFFFF" stroke="#1F3D2B" stroke-width="2.5"/>
+      <circle cx="15" cy="17" r="6" fill="none" stroke="#1F3D2B" stroke-width="2.5"/>
+      <rect x="10" y="0" width="10" height="8" rx="2" fill="none" stroke="#1F3D2B" stroke-width="2.5"/>
+    </g>
+  </svg>`;
+}
+
+// ---------- LANDING (site marketing) ----------
+function renderLanding() {
+  app.innerHTML = `
+    <nav class="site-nav">
+      <div class="nav-inner">
+        <div class="brand"><span class="brand-dot"></span>Preuvia</div>
+        <div class="nav-links">
+          <a href="#features">Fonctionnalités</a>
+          <a href="#how">Comment ça marche</a>
+          <a href="#pricing">Tarifs</a>
+          <a id="navLegal">Mentions légales</a>
+        </div>
+        <div class="nav-cta">
+          <button class="secondary" id="navLogin">Se connecter</button>
+          <button class="primary" id="navSignup" style="margin-top:0;">Créer un compte</button>
+        </div>
+      </div>
+    </nav>
+
+    <section class="hero-section">
+      <div class="hero-grid">
+        <div>
+          <div class="eyebrow">État des lieux nouvelle génération</div>
+          <h1>Fini les litiges sur le dépôt de <span class="accent">garantie</span>.</h1>
+          <p class="lead">Preuvia horodate les photos d'entrée et de sortie de chaque pièce, les compare automatiquement grâce à l'IA, et garde un dossier partagé entre locataire et propriétaire — accessible à tout moment, opposable en cas de désaccord.</p>
+          <div class="hero-cta-row">
+            <button class="primary" id="heroSignup">Créer un compte</button>
+            <button class="secondary" id="heroLogin">Se connecter</button>
+          </div>
+        </div>
+        <div class="hero-illustration-wrap" style="padding:0; overflow:hidden;">
+          <img src="https://images.unsplash.com/photo-1737442724990-af0fa0885312?fm=jpg&q=80&w=900&auto=format&fit=crop" alt="Photo d'un appartement prise avec un smartphone" style="width:100%; height:100%; object-fit:cover; display:block; border-radius:24px;">
+        </div>
+      </div>
+    </section>
+
+    <div class="stat-strip">
+      <div class="stat"><span class="num">48%</span><span class="lbl">des litiges locatifs portent sur l'état du logement</span></div>
+      <div class="stat"><span class="num">&lt; 5 min</span><span class="lbl">pour documenter une pièce en photo</span></div>
+      <div class="stat"><span class="num">100%</span><span class="lbl">des photos horodatées et partagées</span></div>
+    </div>
+
+    <section class="section" id="features">
+      <div class="section-inner">
+        <div class="section-tight">
+          <div class="eyebrow">Fonctionnalités</div>
+          <h2 style="font-size:28px;">Tout ce qu'il faut pour un état des lieux incontestable</h2>
+        </div>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <div class="ficon">📷</div>
+            <h3>Photos horodatées</h3>
+            <p>Chaque photo est datée automatiquement au moment de la prise, pièce par pièce, sans possibilité de modification a posteriori.</p>
+          </div>
+          <div class="feature-card">
+            <div class="ficon">🤝</div>
+            <h3>Dossier partagé</h3>
+            <p>Locataire et propriétaire accèdent au même dossier, avec les mêmes informations, depuis n'importe quel appareil.</p>
+          </div>
+          <div class="feature-card">
+            <div class="ficon">✨</div>
+            <h3>Comparaison par IA</h3>
+            <p>L'intelligence artificielle repère les différences entre l'entrée et la sortie et évalue leur gravité, à valider ensemble.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="how" style="padding-top:0;">
+      <div class="section-inner">
+        <div class="section-tight">
+          <div class="eyebrow">Comment ça marche</div>
+          <h2 style="font-size:28px;">Trois étapes, un dossier solide</h2>
+        </div>
+        <div class="steps-row">
+          <div class="step-card"><div class="stepnum">01</div><h3>Crée le dossier</h3><p>Adresse du logement, coordonnées des deux parties, en moins d'une minute.</p></div>
+          <div class="step-card"><div class="stepnum">02</div><h3>Documente chaque pièce</h3><p>Photos horodatées à l'entrée, puis à la sortie, consultables par les deux parties.</p></div>
+          <div class="step-card"><div class="stepnum">03</div><h3>Compare et valide</h3><p>L'IA propose les différences constatées, à confirmer ensemble avant restitution des clés.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section pricing-section" id="pricing">
+      <div class="section-inner">
+        <div class="section-tight">
+          <div class="eyebrow">Tarifs</div>
+          <h2 style="font-size:28px;">Une formule pour chaque usage</h2>
+        </div>
+        <div style="display:flex; justify-content:center; gap:8px; margin-top:24px;">
+          <button class="tab active" id="cycleMonthly" style="max-width:140px;">Mensuel</button>
+          <button class="tab" id="cycleAnnual" style="max-width:140px;">Annuel <span style="font-size:10px; opacity:0.8;">−2 mois</span></button>
+        </div>
+        <div class="pricing-grid" id="pricingGrid"></div>
+      </div>
+    </section>
+
+    <section class="cta-band">
+      <div class="cta-bg"></div>
+      <div class="cta-content">
+        <h2>Prêt à sécuriser votre prochain état des lieux ?</h2>
+        <p>Sans engagement, création de compte en moins de deux minutes.</p>
+        <button class="primary" id="ctaSignup">Créer un compte</button>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="brand" style="font-size:15px;"><span class="brand-dot"></span>Preuvia</div>
+        <div class="footer-links">
+          <a id="footerLegal">Mentions légales & confidentialité</a>
+        </div>
+        <div class="footer-copy">© ${new Date().getFullYear()} Preuvia</div>
+      </div>
+    </footer>
+  `;
+
+  const pricingGrid = document.getElementById('pricingGrid');
+  function renderPricingCards(cycle) {
+    pricingGrid.innerHTML = PLANS.map(p => `
+      <div class="plan-card ${p.id === 'pro' ? 'highlight' : ''}">
+        ${p.id === 'pro' ? '<span class="plan-badge">Le plus choisi</span>' : ''}
+        <p class="pname">${esc(p.name)}</p>
+        <p class="pprice">${cycle === 'annual' ? esc(p.priceAnnual.split(' / ')[0]) : esc(p.price.split(' / ')[0])}<span> / ${cycle === 'annual' ? 'an' : 'mois'}</span></p>
+        ${cycle === 'annual' ? `<p style="font-size:11.5px; color:var(--forest); font-weight:600; margin:0 0 10px;">${esc(p.saveAnnual)}</p>` : `<p class="ptagline">${esc(p.tagline)}</p>`}
+        ${p.features.map(f => `<div class="plan-feature"><span class="check">✓</span><span>${esc(f)}</span></div>`).join('')}
+        <button class="primary" data-plan="${p.id}">Choisir ${esc(p.name)}</button>
+      </div>
+    `).join('');
+    pricingGrid.querySelectorAll('button[data-plan]').forEach(btn => {
+      btn.onclick = () => {
+        const basePlan = PLANS.find(p => p.id === btn.dataset.plan);
+        state.selectedPlan = cycle === 'annual'
+          ? { ...basePlan, price: basePlan.priceAnnual, id: basePlan.id + '-annual' }
+          : basePlan;
+        state.view = 'signup-form';
+        render();
+      };
+    });
+  }
+  renderPricingCards('monthly');
+  document.getElementById('cycleMonthly').onclick = () => {
+    document.getElementById('cycleMonthly').classList.add('active');
+    document.getElementById('cycleAnnual').classList.remove('active');
+    renderPricingCards('monthly');
+  };
+  document.getElementById('cycleAnnual').onclick = () => {
+    document.getElementById('cycleAnnual').classList.add('active');
+    document.getElementById('cycleMonthly').classList.remove('active');
+    renderPricingCards('annual');
+  };
+
+  const goSignup = () => { state.selectedPlan = PLANS.find(p => p.id === 'pro'); state.view = 'signup-form'; render(); };
+  const goLogin = () => { state.view = 'login'; render(); };
+  document.getElementById('navSignup').onclick = goSignup;
+  document.getElementById('heroSignup').onclick = goSignup;
+  document.getElementById('ctaSignup').onclick = goSignup;
+  document.getElementById('navLogin').onclick = goLogin;
+  document.getElementById('heroLogin').onclick = goLogin;
+  document.getElementById('navLegal').onclick = () => { state.view = 'legal'; render(); };
+  document.getElementById('footerLegal').onclick = () => { state.view = 'legal'; render(); };
+}
+
+function renderLegal() {
+  app.innerHTML = `
+    <nav class="site-nav">
+      <div class="nav-inner">
+        <div class="brand" id="backBrand" style="cursor:pointer;"><span class="brand-dot"></span>Preuvia</div>
+        <div class="nav-cta"><button class="secondary" id="backHome" style="margin-top:0;">&larr; Retour</button></div>
+      </div>
+    </nav>
+    <section class="section">
+      <div class="section-inner" style="max-width:720px;">
+        <h1 style="font-size:28px;">Mentions légales & confidentialité</h1>
+        <div class="card legal-text">
+          <h3>Éditeur du site</h3>
+          <p>[Nom / raison sociale à compléter], [forme juridique à compléter].<br>
+          Adresse : [adresse à compléter].<br>
+          SIRET : [à compléter].<br>
+          Contact : [email de contact à compléter].<br>
+          Directeur de la publication : [nom à compléter].</p>
+
+          <h3>Hébergement</h3>
+          <p>Site hébergé par Netlify, Inc. Base de données et stockage des fichiers hébergés par Supabase (infrastructure Europe).</p>
+
+          <h3>Objet du service</h3>
+          <p>L'application permet la réalisation d'états des lieux locatifs numériques : création d'un dossier par logement, dépôt de photos horodatées par pièce, consultation partagée entre locataire et propriétaire, et assistance par intelligence artificielle pour identifier les différences entre l'entrée et la sortie. Les résultats générés par l'IA sont indicatifs et doivent être validés par les deux parties avant toute valeur contractuelle.</p>
+
+          <h3>Données personnelles</h3>
+          <p>Sont collectées : adresse email, nom et prénom des parties, adresse du logement concerné, et les photos déposées dans les dossiers. Ces données sont utilisées uniquement pour le fonctionnement du service et ne sont jamais vendues à des tiers.</p>
+          <p>Les photos peuvent être transmises à un service tiers d'intelligence artificielle (Anthropic) dans le seul but de générer la comparaison entre les photos d'entrée et de sortie.</p>
+          <p>Conformément au RGPD, vous disposez d'un droit d'accès, de rectification et de suppression de vos données, à exercer auprès de [email de contact à compléter].</p>
+
+          <h3>Cookies</h3>
+          <p>Le service utilise uniquement des cookies techniques nécessaires à l'authentification (gestion de session). Aucun cookie publicitaire n'est utilisé.</p>
+
+          <p class="notice">Ce texte est un modèle de départ à faire relire et compléter (informations d'entreprise, SIRET, contact réel) avant toute mise en ligne publique définitive.</p>
+        </div>
+      </div>
+    </section>
+  `;
+  document.getElementById('backHome').onclick = () => { state.view = 'landing'; render(); };
+  document.getElementById('backBrand').onclick = () => { state.view = 'landing'; render(); };
+}
+
+// ---------- LOGIN ----------
+function renderLogin() {
+  app.innerHTML = `<div class="shell">
+    <span class="back-link" id="back">&larr; Retour au site</span>
+    <h1>Se connecter</h1>
+    <p class="subtitle">Accède à tes dossiers existants.</p>
+    <div class="card">
+      <label>Email</label>
+      <input type="email" id="authEmail">
+      <label>Mot de passe</label>
+      <input type="password" id="authPassword">
+      <button class="primary" id="loginBtn">Se connecter</button>
+      <div class="status" id="authStatus"></div>
+    </div>
+    <p class="notice">Pas encore de compte ? <a id="toSignup" style="text-decoration:underline; cursor:pointer;">Voir les tarifs</a></p>
+  </div>`;
+  document.getElementById('back').onclick = () => { state.view = 'landing'; render(); };
+  document.getElementById('toSignup').onclick = () => { state.view = 'landing'; render(); setTimeout(() => document.getElementById('pricing')?.scrollIntoView(), 50); };
+  document.getElementById('loginBtn').onclick = async () => {
+    const statusEl = document.getElementById('authStatus');
+    statusEl.style.color = ''; statusEl.textContent = 'Connexion...';
+    const { error } = await sb.auth.signInWithPassword({
+      email: document.getElementById('authEmail').value.trim(),
+      password: document.getElementById('authPassword').value
+    });
+    if (error) { statusEl.style.color = '#A32D2D'; statusEl.textContent = error.message; return; }
+    state.view = 'home'; render();
+  };
+}
+
+// ---------- SIGNUP : FORMULAIRE (plan déjà choisi sur la page tarifs) ----------
+function renderSignupForm() {
+  const plan = state.selectedPlan || PLANS.find(p => p.id === 'pro');
+  app.innerHTML = `<div class="shell">
+    <span class="back-link" id="back">&larr; Changer de formule</span>
+    <h1>Créer un compte</h1>
+    <p class="subtitle">Formule sélectionnée : <strong>${esc(plan.name)}</strong> — ${esc(plan.price)}</p>
+    <div class="card">
+      <label>Email</label>
+      <input type="email" id="authEmail">
+      <label>Mot de passe</label>
+      <input type="password" id="authPassword">
+      <button class="primary" id="signupBtn">Créer mon compte</button>
+      <div class="status" id="authStatus"></div>
+    </div>
+    <p class="notice">La sélection de formule est enregistrée mais aucun paiement n'est encore prélevé à ce stade du projet.</p>
+  </div>`;
+  document.getElementById('back').onclick = () => { state.view = 'landing'; render(); setTimeout(() => document.getElementById('pricing')?.scrollIntoView(), 50); };
+  document.getElementById('signupBtn').onclick = async () => {
+    const statusEl = document.getElementById('authStatus');
+    statusEl.style.color = ''; statusEl.textContent = 'Création du compte...';
+    const { error } = await sb.auth.signUp({
+      email: document.getElementById('authEmail').value.trim(),
+      password: document.getElementById('authPassword').value,
+      options: { data: { plan: plan.id } }
+    });
+    if (error) { statusEl.style.color = '#A32D2D'; statusEl.textContent = error.message; return; }
+    statusEl.style.color = '#3B6D11';
+    statusEl.textContent = 'Compte créé. Si la confirmation par email est activée, vérifie ta boîte mail avant de te connecter.';
+  };
+}
+
+function renderHome(root) {
+  root.innerHTML = `
+    <div class="topbar">
+      <h1 style="margin:0;">État des lieux</h1>
+      <span class="email" id="logout">Déconnexion</span>
+    </div>
+    <p class="subtitle">Connecté en tant que ${esc(state.session.user.email)}</p>
+    <div class="card">
+      <h2>Nouveau dossier</h2>
+      <button class="primary" id="goCreate">Créer un dossier</button>
+    </div>
+    <div class="card">
+      <h2>Rejoindre un dossier existant</h2>
+      <label>Code du dossier</label>
+      <input type="text" id="joinCode" style="text-transform:uppercase;">
+      <button class="secondary" id="goJoin">Continuer</button>
+      <div class="status" id="joinStatus"></div>
+    </div>
+  `;
+  document.getElementById('logout').onclick = async () => { await sb.auth.signOut(); };
+  document.getElementById('goCreate').onclick = () => { state.view = 'create'; render(); };
+  document.getElementById('goJoin').onclick = () => {
+    const code = document.getElementById('joinCode').value.trim().toUpperCase();
+    if (!code) { document.getElementById('joinStatus').textContent = 'Entre un code.'; return; }
+    state.code = code;
+    state.view = 'joinRole';
+    render();
+  };
+}
+
+function renderJoinRole(root) {
+  root.innerHTML = `
+    <span class="back-link" id="back">&larr; Retour</span>
+    <h1>Rejoindre le dossier ${esc(state.code)}</h1>
+    <p class="subtitle">Tu es locataire ou propriétaire pour ce dossier ?</p>
+    <div class="card">
+      <button class="primary" id="asTenant" style="margin-top:0;">Je suis locataire</button>
+      <button class="secondary" id="asLandlord">Je suis propriétaire</button>
+      <div class="status" id="joinRoleStatus"></div>
+    </div>
+  `;
+  document.getElementById('back').onclick = () => { state.view = 'home'; render(); };
+  async function doJoin(role) {
+    const statusEl = document.getElementById('joinRoleStatus');
+    statusEl.textContent = 'Connexion au dossier...';
+    const { data, error } = await sb.rpc('join_dossier', { dossier_code: state.code, as_role: role });
+    if (error) { statusEl.style.color = '#A32D2D'; statusEl.textContent = error.message; return; }
+    await openDossierById(data);
+  }
+  document.getElementById('asTenant').onclick = () => doJoin('tenant');
+  document.getElementById('asLandlord').onclick = () => doJoin('landlord');
+}
+
+async function openDossierById(id) {
+  const { data, error } = await sb.from('dossiers').select('*').eq('id', id).single();
+  if (error) { alert(error.message); return; }
+  const { data: rooms } = await sb.from('rooms').select('*').eq('dossier_id', id).order('created_at');
+  state.dossier = data;
+  state.code = data.code;
+  state.rooms = rooms || [];
+  state.view = 'dossier';
+  render();
+}
+
+function renderCreate(root) {
+  root.innerHTML = `
+    <span class="back-link" id="back">&larr; Retour</span>
+    <h1>Nouveau dossier</h1>
+    <div class="card">
+      <label>Adresse du logement</label>
+      <input type="text" id="address" placeholder="12 rue des Fleurs, 33000 Bordeaux">
+      <label>Locataire</label>
+      <div class="row2">
+        <input type="text" id="tenantFirst" placeholder="Prénom">
+        <input type="text" id="tenantLast" placeholder="Nom">
+      </div>
+      <label>Propriétaire / bailleur</label>
+      <div class="row2">
+        <input type="text" id="landlordFirst" placeholder="Prénom">
+        <input type="text" id="landlordLast" placeholder="Nom">
+      </div>
+      <label>Type d'état des lieux</label>
+      <div class="row2">
+        <button class="tab active" id="typeEntree">Entrée</button>
+        <button class="tab" id="typeSortie">Sortie</button>
+      </div>
+      <label>Tu es</label>
+      <div class="row2">
+        <button class="tab active" id="roleTenant">Locataire</button>
+        <button class="tab" id="roleLandlord">Propriétaire</button>
+      </div>
+      <button class="primary" id="submitCreate">Créer le dossier</button>
+      <div class="status" id="createStatus"></div>
+    </div>
+  `;
+  let edlType = 'entree';
+  let myRole = 'tenant';
+  document.getElementById('back').onclick = () => { state.view = 'home'; render(); };
+  document.getElementById('typeEntree').onclick = () => { edlType = 'entree'; document.getElementById('typeEntree').classList.add('active'); document.getElementById('typeSortie').classList.remove('active'); };
+  document.getElementById('typeSortie').onclick = () => { edlType = 'sortie'; document.getElementById('typeSortie').classList.add('active'); document.getElementById('typeEntree').classList.remove('active'); };
+  document.getElementById('roleTenant').onclick = () => { myRole = 'tenant'; document.getElementById('roleTenant').classList.add('active'); document.getElementById('roleLandlord').classList.remove('active'); };
+  document.getElementById('roleLandlord').onclick = () => { myRole = 'landlord'; document.getElementById('roleLandlord').classList.add('active'); document.getElementById('roleTenant').classList.remove('active'); };
+
+  document.getElementById('submitCreate').onclick = async () => {
+    const statusEl = document.getElementById('createStatus');
+    const btn = document.getElementById('submitCreate');
+    const address = document.getElementById('address').value.trim();
+    const tenantFirst = document.getElementById('tenantFirst').value.trim();
+    const tenantLast = document.getElementById('tenantLast').value.trim();
+    const landlordFirst = document.getElementById('landlordFirst').value.trim();
+    const landlordLast = document.getElementById('landlordLast').value.trim();
+    if (!address || !tenantFirst || !tenantLast || !landlordFirst || !landlordLast) {
+      statusEl.style.color = '#A32D2D';
+      statusEl.textContent = 'Merci de remplir tous les champs.';
+      return;
+    }
+    btn.disabled = true;
+    statusEl.style.color = '';
+    statusEl.textContent = 'Création du dossier...';
+    const userId = state.session.user.id;
+    const row = {
+      code: genCode(), address, edl_type: edlType,
+      tenant_first: tenantFirst, tenant_last: tenantLast,
+      landlord_first: landlordFirst, landlord_last: landlordLast,
+      created_by: userId,
+      tenant_user_id: myRole === 'tenant' ? userId : null,
+      landlord_user_id: myRole === 'landlord' ? userId : null
+    };
+    const { data, error } = await sb.from('dossiers').insert(row).select().single();
+    if (error) {
+      btn.disabled = false;
+      statusEl.style.color = '#A32D2D';
+      statusEl.textContent = 'Erreur : ' + error.message;
+      return;
+    }
+    state.dossier = data;
+    state.code = data.code;
+    state.rooms = [];
+    state.view = 'dossier';
+    render();
+  };
+}
+
+function renderDossier(root) {
+  const d = state.dossier;
+  const rooms = state.rooms || [];
+  root.innerHTML = `
+    <span class="back-link" id="back">&larr; Retour à l'accueil</span>
+    <div class="code-banner">
+      <div>
+        <p class="label">Code du dossier — à partager avec l'autre partie</p>
+        <p class="code">${esc(d.code)}</p>
+      </div>
+      <button class="small" id="copyCode">Copier</button>
+    </div>
+    <div class="card">
+      <h2>${esc(d.address)}</h2>
+      <p class="meta-line">État des lieux ${d.edl_type === 'entree' ? "d'entrée" : "de sortie"}</p>
+      <p class="meta-line">Locataire : ${esc(d.tenant_first)} ${esc(d.tenant_last)} ${d.tenant_user_id ? '✅' : '⏳ en attente'}</p>
+      <p class="meta-line">Propriétaire : ${esc(d.landlord_first)} ${esc(d.landlord_last)} ${d.landlord_user_id ? '✅' : '⏳ en attente'}</p>
+    </div>
+    <h2>Pièces</h2>
+    <div id="roomsList"></div>
+    <div class="card">
+      <label>Ajouter une pièce</label>
+      <div class="add-room-row">
+        <input type="text" id="newRoomName" placeholder="Ex: Chambre 1">
+        <button class="small" id="addRoomBtn">Ajouter</button>
+      </div>
+      <div class="status" id="roomStatus"></div>
+    </div>
+  `;
+  document.getElementById('back').onclick = () => { state.view = 'home'; render(); };
+  document.getElementById('copyCode').onclick = () => {
+    navigator.clipboard.writeText(d.code).catch(() => {});
+    const btn = document.getElementById('copyCode');
+    btn.textContent = 'Copié !'; setTimeout(() => { btn.textContent = 'Copier'; }, 1500);
+  };
+  document.getElementById('addRoomBtn').onclick = async () => {
+    const input = document.getElementById('newRoomName');
+    const name = input.value.trim();
+    const statusEl = document.getElementById('roomStatus');
+    if (!name) return;
+    const { data, error } = await sb.from('rooms').insert({ dossier_id: d.id, name }).select().single();
+    if (error) { statusEl.style.color = '#A32D2D'; statusEl.textContent = error.message; return; }
+    state.rooms.push(data);
+    render();
+  };
+
+  const roomsListEl = document.getElementById('roomsList');
+  if (rooms.length === 0) {
+    roomsListEl.innerHTML = '<div class="empty-state">Aucune pièce ajoutée pour l\'instant.</div>';
+  } else {
+    roomsListEl.innerHTML = rooms.map(r => `<div class="room-card" data-id="${r.id}"><p class="rname">${esc(r.name)}</p></div>`).join('');
+    roomsListEl.querySelectorAll('.room-card').forEach(el => {
+      el.onclick = () => { state.currentRoom = rooms.find(r => r.id === el.dataset.id); state.view = 'room'; render(); };
+    });
+  }
+}
+
+async function renderRoom(root) {
+  const d = state.dossier;
+  const room = state.currentRoom;
+  root.innerHTML = '<p class="status">Chargement de la pièce...</p>';
+
+  const { data: photos } = await sb.from('photos').select('*').eq('room_id', room.id).order('taken_at');
+  const entryPhotos = (photos || []).filter(p => p.phase === 'entry');
+  const exitPhotos = (photos || []).filter(p => p.phase === 'exit');
+  const { data: diffRows } = await sb.from('diffs').select('*').eq('room_id', room.id).order('created_at', { ascending: false }).limit(1);
+  const diffs = diffRows && diffRows[0] ? diffRows[0].differences : null;
+
+  async function signedUrl(path) {
+    const { data } = await sb.storage.from('photos').createSignedUrl(path, 3600);
+    return data ? data.signedUrl : '';
+  }
+  const entryUrls = await Promise.all(entryPhotos.map(p => signedUrl(p.storage_path)));
+  const exitUrls = await Promise.all(exitPhotos.map(p => signedUrl(p.storage_path)));
+
+  root.innerHTML = `
+    <span class="back-link" id="back">&larr; Retour au dossier</span>
+    <h1>${esc(room.name)}</h1>
+    <p class="subtitle">${esc(d.address)}</p>
+    <div class="card">
+      <h2>Photos d'entrée</h2>
+      <div class="photo-grid" id="entryGrid"></div>
+      <div class="upload-zone" id="entryUploadZone">+ Ajouter une photo horodatée</div>
+      <input type="file" id="entryFile" accept="image/*">
+      <div class="status" id="entryStatus"></div>
+    </div>
+    <div class="card">
+      <h2>Photos de sortie</h2>
+      <div class="photo-grid" id="exitGrid"></div>
+      <div class="upload-zone" id="exitUploadZone">+ Ajouter une photo horodatée</div>
+      <input type="file" id="exitFile" accept="image/*">
+      <div class="status" id="exitStatus"></div>
+    </div>
+    <div class="card">
+      <h2>Comparaison IA entrée / sortie</h2>
+      <div id="aiContent"></div>
+    </div>
+    <div class="lightbox" id="lightbox">
+      <button class="lightbox-close" id="lightboxClose">&times;</button>
+      <img id="lightboxImg" src="">
+      <p class="lightbox-ts" id="lightboxTs"></p>
+    </div>
+  `;
+  document.getElementById('back').onclick = () => { state.view = 'dossier'; render(); };
+  document.getElementById('lightboxClose').onclick = closeLightbox;
+  document.getElementById('lightbox').onclick = (e) => { if (e.target.id === 'lightbox') closeLightbox(); };
+
+  function openLightbox(url, ts) {
+    document.getElementById('lightboxImg').src = url;
+    document.getElementById('lightboxTs').textContent = ts ? formatTs(ts) : '';
+    document.getElementById('lightbox').classList.add('open');
+  }
+  function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('open');
+  }
+
+  function renderGrid(elId, photoList, urls, phase) {
+    const el = document.getElementById(elId);
+    el.innerHTML = photoList.map((p, i) => `<div class="photo-item"><img src="${urls[i]}" data-url="${esc(urls[i])}" data-ts="${p.taken_at}"><button class="photo-delete" data-id="${p.id}" data-path="${esc(p.storage_path)}" data-phase="${phase}" title="Supprimer">&times;</button><span class="photo-ts">${formatTs(p.taken_at)}</span></div>`).join('');
+    el.querySelectorAll('.photo-item img').forEach(img => {
+      img.onclick = () => openLightbox(img.dataset.url, img.dataset.ts);
+    });
+    el.querySelectorAll('.photo-delete').forEach(btn => {
+      btn.onclick = async () => {
+        const debugEl = document.getElementById(btn.dataset.phase + 'Status');
+        if (btn.dataset.confirming !== '1') {
+          btn.dataset.confirming = '1';
+          btn.textContent = '✓';
+          btn.style.background = '#A32D2D';
+          btn.title = 'Cliquer à nouveau pour confirmer';
+          setTimeout(() => {
+            if (btn.dataset.confirming === '1') {
+              btn.dataset.confirming = '0';
+              btn.textContent = '×';
+              btn.style.background = '';
+              btn.title = 'Supprimer';
+            }
+          }, 5000);
+          return;
+        }
+        btn.disabled = true;
+        try {
+          const { error: storageErr } = await sb.storage.from('photos').remove([btn.dataset.path]);
+          if (storageErr) throw new Error('Stockage : ' + storageErr.message);
+          const { error: dbErr } = await sb.from('photos').delete().eq('id', btn.dataset.id);
+          if (dbErr) throw new Error('Base de données : ' + dbErr.message);
+          render();
+        } catch (err) {
+          debugEl.style.color = '#A32D2D';
+          debugEl.textContent = 'Erreur : ' + (err && err.message ? err.message : String(err));
+          btn.disabled = false;
+          btn.dataset.confirming = '0';
+          btn.textContent = '×';
+          btn.style.background = '';
+        }
+      };
+    });
+  }
+  renderGrid('entryGrid', entryPhotos, entryUrls, 'entry');
+  renderGrid('exitGrid', exitPhotos, exitUrls, 'exit');
+
+  function setupUpload(zoneId, fileId, phase, statusId) {
+    const zone = document.getElementById(zoneId);
+    const file = document.getElementById(fileId);
+    const statusEl = document.getElementById(statusId);
+    zone.onclick = () => file.click();
+    file.onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      statusEl.textContent = 'Envoi en cours...';
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        try {
+          const resized = await resizeImage(ev.target.result, 1000);
+          const blob = dataUrlToBlob(resized);
+          const path = `${d.id}/${room.id}/${phase}/${Date.now()}.jpg`;
+          const { error: upErr } = await sb.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg' });
+          if (upErr) throw upErr;
+          const { error: insErr } = await sb.from('photos').insert({
+            room_id: room.id, phase, storage_path: path, uploaded_by: state.session.user.id
+          });
+          if (insErr) throw insErr;
+          render();
+        } catch (err) {
+          statusEl.style.color = '#A32D2D';
+          statusEl.textContent = 'Erreur : ' + err.message;
+        }
+      };
+      reader.readAsDataURL(f);
+    };
+  }
+  setupUpload('entryUploadZone', 'entryFile', 'entry', 'entryStatus');
+  setupUpload('exitUploadZone', 'exitFile', 'exit', 'exitStatus');
+
+  const aiContent = document.getElementById('aiContent');
+  if (entryPhotos.length === 0 || exitPhotos.length === 0) {
+    aiContent.innerHTML = '<p class="meta-line">Ajoute au moins une photo d\'entrée et une photo de sortie pour lancer la comparaison.</p>';
+  } else if (diffs) {
+    renderDiffs(aiContent, diffs);
+    aiContent.innerHTML += '<button class="secondary" id="rerunAi">Relancer l\'analyse</button>';
+    document.getElementById('rerunAi').onclick = () => runAiComparison(entryUrls[0], exitUrls[0]);
+  } else {
+    aiContent.innerHTML = '<button class="primary" id="runAi" style="margin-top:0;">Analyser les différences</button><div class="status" id="aiStatus"></div>';
+    document.getElementById('runAi').onclick = () => runAiComparison(entryUrls[0], exitUrls[0]);
+  }
+
+  function renderDiffs(container, diffsData) {
+    if (!diffsData.differences || diffsData.differences.length === 0) {
+      container.innerHTML = '<div class="empty-state">Aucune différence significative détectée.</div>';
+      return;
+    }
+    container.innerHTML = diffsData.differences.map(dd => {
+      const sev = (dd.severity || 'mineur').toLowerCase();
+      return `<div class="diff-card"><span class="badge ${sev === 'majeur' ? 'majeur' : 'mineur'}">${sev === 'majeur' ? 'Majeur' : 'Mineur'}</span><div class="diff-text"><p>${esc(dd.description)}</p><p class="conf">Confiance IA · ${Math.round(dd.confidence)}%</p></div></div>`;
+    }).join('') + '<p class="notice">Ces observations doivent être confirmées par les deux parties avant validation.</p>';
+  }
+
+  async function urlToBase64(url) {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function runAiComparison(entryUrl, exitUrl) {
+    const btn = document.getElementById('runAi') || document.getElementById('rerunAi');
+    if (btn) btn.disabled = true;
+    const statusEl = document.getElementById('aiStatus');
+    if (statusEl) statusEl.textContent = 'Analyse en cours...';
+
+    const systemPrompt = `Tu es un expert en état des lieux locatif. On te donne deux photos de la même zone d'un logement : une prise à l'entrée du locataire, une prise à la sortie. Compare-les et identifie les différences visibles (taches, rayures, trous, usures anormales, éléments manquants ou cassés). Ignore les différences de luminosité, d'angle de prise de vue ou de meubles déplacés qui ne sont pas des dégradations.
+
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, sans balises markdown, au format exact suivant :
+{"differences": [{"description": "description courte en français", "severity": "mineur ou majeur", "confidence": nombre entre 0 et 100}]}
+
+Si aucune différence significative n'est détectée, renvoie {"differences": []}.`;
+
+    try {
+      const entryB64 = await urlToBase64(entryUrl);
+      const exitB64 = await urlToBase64(exitUrl);
+      const response = await fetch("/.netlify/functions/ai-compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: `Photos de la pièce : ${room.name}. Photo 1 = entrée. Photo 2 = sortie.` },
+              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: entryB64 } },
+              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: exitB64 } }
+            ]
+          }]
+        })
+      });
+      const data = await response.json();
+      const textBlock = data.content.find(b => b.type === "text");
+      if (!textBlock) throw new Error("Réponse inattendue du modèle.");
+      const cleaned = textBlock.text.trim().replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      await sb.from('diffs').insert({ room_id: room.id, differences: parsed });
+      render();
+    } catch (err) {
+      if (statusEl) statusEl.innerHTML = `<div class="error-box">Erreur : ${esc(err.message)}</div>`;
+      if (btn) btn.disabled = false;
+    }
+  }
+}
+</script>
+</body>
+</html>
