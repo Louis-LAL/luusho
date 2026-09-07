@@ -918,7 +918,7 @@ Si aucune différence significative n'est détectée, renvoie {"differences": []
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-6",
+          model: "claude-sonnet-5",
           max_tokens: 1000,
           system: systemPrompt,
           messages: [{
@@ -932,6 +932,10 @@ Si aucune différence significative n'est détectée, renvoie {"differences": []
         })
       });
       const data = await response.json();
+      if (!response.ok || data.type === 'error') {
+        const apiMsg = (data.error && data.error.message) || data.error || JSON.stringify(data);
+        throw new Error(apiMsg);
+      }
       const textBlock = data.content.find(b => b.type === "text");
       if (!textBlock) throw new Error("Réponse inattendue du modèle.");
       const cleaned = textBlock.text.trim().replace(/```json|```/g, '').trim();
