@@ -844,7 +844,7 @@ async function renderRoom(root) {
       const reader = new FileReader();
       reader.onload = async (ev) => {
         try {
-          const resized = await resizeImage(ev.target.result, 1000);
+          const resized = await resizeImage(ev.target.result, 1400);
           const blob = dataUrlToBlob(resized);
           const path = `${d.id}/${room.id}/${phase}/${Date.now()}.jpg`;
           const { error: upErr } = await sb.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg' });
@@ -904,12 +904,16 @@ async function renderRoom(root) {
     const statusEl = document.getElementById('aiStatus');
     if (statusEl) statusEl.textContent = 'Analyse en cours...';
 
-    const systemPrompt = `Tu es un expert en état des lieux locatif. On te donne deux photos de la même zone d'un logement : une prise à l'entrée du locataire, une prise à la sortie. Compare-les et identifie les différences visibles (taches, rayures, trous, usures anormales, éléments manquants ou cassés). Ignore les différences de luminosité, d'angle de prise de vue ou de meubles déplacés qui ne sont pas des dégradations.
+    const systemPrompt = `Tu es un expert en état des lieux locatif, reconnu pour ton sens du détail. On te donne deux photos de la même zone d'un logement : une prise à l'entrée du locataire, une prise à la sortie. Compare-les très attentivement, y compris les détails fins (petites taches, micro-rayures, salissures légères, traces d'usure, marques sur les murs ou le mobilier).
+
+Ignore uniquement les différences qui ne sont clairement pas des dégradations : luminosité, angle de prise de vue, meubles déplacés, reflets, ombres.
+
+Ne rejette pas une observation simplement parce que tu n'es pas certain à 100% : si tu repères quelque chose qui pourrait être une différence mais que tu n'es pas sûr, inclus-la quand même avec un niveau de confiance bas (par exemple 30 à 50%) plutôt que de l'omettre. Il vaut mieux signaler une observation incertaine que d'en manquer une réelle.
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, sans balises markdown, au format exact suivant :
 {"differences": [{"description": "description courte en français", "severity": "mineur ou majeur", "confidence": nombre entre 0 et 100}]}
 
-Si aucune différence significative n'est détectée, renvoie {"differences": []}.`;
+Si tu as vraiment tout examiné (murs, sol, plafond, mobilier visible, angles, recoins) et qu'il n'y a réellement aucune différence même mineure, renvoie {"differences": []}.`;
 
     try {
       const entryB64 = await urlToBase64(entryUrl);
