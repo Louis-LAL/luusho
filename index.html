@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; }
   :root {
@@ -211,6 +212,24 @@ function dataUrlToBlob(dataUrl) {
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return new Blob([arr], { type: mime });
+}
+async function urlToBase64(url) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.readAsDataURL(blob);
+  });
+}
+async function urlToDataUrl(url) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
 }
 
 // ---------- INIT AUTH ----------
@@ -671,6 +690,106 @@ function renderCreate(root) {
   };
 }
 
+async function generateAndSendReport(d, rooms) {
+  const statusEl = document.getElementById('reportStatus');
+  const btn = document.getElementById('sendReportBtn');
+  btn.disabled = true;
+  statusEl.style.color = '';
+  statusEl.textContent = 'Préparation du rapport...';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 40;
+    let y = 50;
+
+    doc.setFontSize(18);
+    doc.text("État des lieux", margin, y);
+    y += 26;
+    doc.setFontSize(11);
+    doc.text(`Adresse : ${d.address}`, margin, y); y += 16;
+    doc.text(`Type : état des lieux ${d.edl_type === 'entree' ? "d'entrée" : "de sortie"}`, margin, y); y += 16;
+    doc.text(`Locataire : ${d.tenant_first} ${d.tenant_last}`, margin, y); y += 16;
+    doc.text(`Propriétaire : ${d.landlord_first} ${d.landlord_last}`, margin, y); y += 16;
+    doc.text(`Dossier : ${d.code}`, margin, y); y += 30;
+
+    for (const room of rooms) {
+      statusEl.textContent = `Ajout de la pièce "${room.name}"...`;
+
+      if (y > 700) { doc.addPage(); y = 50; }
+      doc.setFontSize(14);
+      doc.text(room.name, margin, y);
+      y += 20;
+
+      const { data: photos } = await sb.from('photos').select('*').eq('room_id', room.id).order('taken_at');
+      const entryPhotos = (photos || []).filter(p => p.phase === 'entry');
+      const exitPhotos = (photos || []).filter(p => p.phase === 'exit');
+
+      async function addPhotoRow(label, photoList) {
+        doc.setFontSize(11);
+        doc.text(label, margin, y);
+        y += 14;
+        let x = margin;
+        const imgSize = 110;
+        for (const p of photoList) {
+          if (x + imgSize > pageWidth - margin) { x = margin; y += imgSize + 20; }
+          if (y + imgSize > 780) { doc.addPage(); y = 50; x = margin; }
+          try {
+            const { data: signed } = await sb.storage.from('photos').createSignedUrl(p.storage_path, 3600);
+            const dataUrl = await urlToDataUrl(signed.signedUrl);
+            doc.addImage(dataUrl, 'JPEG', x, y, imgSize, imgSize * 0.75);
+            doc.setFontSize(8);
+            doc.text(new Date(p.taken_at).toLocaleString('fr-FR'), x, y + imgSize * 0.75 + 10);
+            doc.setFontSize(11);
+          } catch (e) { /* photo ignorée si erreur de chargement */ }
+          x += imgSize + 12;
+        }
+        y += imgSize + 24;
+      }
+
+      if (entryPhotos.length) await addPhotoRow("Photos d'entrée :", entryPhotos);
+      if (exitPhotos.length) await addPhotoRow("Photos de sortie :", exitPhotos);
+
+      const { data: diffRows } = await sb.from('diffs').select('*').eq('room_id', room.id).order('created_at', { ascending: false }).limit(1);
+      const diffs = diffRows && diffRows[0] ? diffRows[0].differences : null;
+      if (diffs && diffs.differences && diffs.differences.length) {
+        if (y > 720) { doc.addPage(); y = 50; }
+        doc.setFontSize(11);
+        doc.text("Différences détectées par IA :", margin, y);
+        y += 16;
+        diffs.differences.forEach(diff => {
+          if (y > 780) { doc.addPage(); y = 50; }
+          doc.setFontSize(10);
+          doc.text(`• [${(diff.severity || 'mineur').toUpperCase()}] ${diff.description} (confiance ${Math.round(diff.confidence)}%)`, margin, y, { maxWidth: pageWidth - margin * 2 });
+          y += 16;
+        });
+        y += 10;
+      }
+      y += 10;
+    }
+
+    statusEl.textContent = 'Envoi de l\'email en cours...';
+    const pdfBase64 = doc.output('datauristring').split(',')[1];
+
+    const response = await fetch('/.netlify/functions/send-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dossierId: d.id, pdfBase64 }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Erreur inconnue');
+
+    statusEl.style.color = '#3B6D11';
+    statusEl.textContent = `Rapport envoyé à : ${result.recipients.join(', ')}`;
+  } catch (err) {
+    statusEl.style.color = '#A32D2D';
+    statusEl.textContent = 'Erreur : ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function renderDossier(root) {
   const d = state.dossier;
   const rooms = state.rooms || [];
@@ -699,6 +818,12 @@ function renderDossier(root) {
       </div>
       <div class="status" id="roomStatus"></div>
     </div>
+    <div class="card">
+      <h2>Rapport du dossier</h2>
+      <p class="meta-line">Génère un PDF récapitulatif (adresse, parties, photos horodatées, différences IA) et envoie-le par email aux deux parties inscrites.</p>
+      <button class="primary" id="sendReportBtn">Envoyer le rapport par email</button>
+      <div class="status" id="reportStatus"></div>
+    </div>
   `;
   document.getElementById('back').onclick = () => { state.view = 'home'; render(); };
   document.getElementById('copyCode').onclick = () => {
@@ -706,6 +831,7 @@ function renderDossier(root) {
     const btn = document.getElementById('copyCode');
     btn.textContent = 'Copié !'; setTimeout(() => { btn.textContent = 'Copier'; }, 1500);
   };
+  document.getElementById('sendReportBtn').onclick = () => generateAndSendReport(d, rooms);
   document.getElementById('addRoomBtn').onclick = async () => {
     const input = document.getElementById('newRoomName');
     const name = input.value.trim();
@@ -886,16 +1012,6 @@ async function renderRoom(root) {
       const sev = (dd.severity || 'mineur').toLowerCase();
       return `<div class="diff-card"><span class="badge ${sev === 'majeur' ? 'majeur' : 'mineur'}">${sev === 'majeur' ? 'Majeur' : 'Mineur'}</span><div class="diff-text"><p>${esc(dd.description)}</p><p class="conf">Confiance IA · ${Math.round(dd.confidence)}%</p></div></div>`;
     }).join('') + '<p class="notice">Ces observations doivent être confirmées par les deux parties avant validation.</p>';
-  }
-
-  async function urlToBase64(url) {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.readAsDataURL(blob);
-    });
   }
 
   async function runAiComparison(entryUrl, exitUrl) {
