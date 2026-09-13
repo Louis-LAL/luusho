@@ -17,8 +17,9 @@ exports.handler = async function (event) {
     return { statusCode: 405, headers: corsHeaders, body: "Méthode non autorisée" };
   }
 
-  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY } = process.env;
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !RESEND_API_KEY) {
+  const SUPABASE_URL = "https://eofytkmpyvfmvwlmvtik.supabase.co";
+  const { SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY } = process.env;
+  if (!SUPABASE_SERVICE_ROLE_KEY || !RESEND_API_KEY) {
     return {
       statusCode: 500,
       headers: corsHeaders,
